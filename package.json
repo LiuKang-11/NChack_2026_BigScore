@@ -2,6 +2,7 @@
   "name": "hackncstate2026",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,6 +10,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "alchemy-sdk": "^3.6.5",
+    "backboard-sdk": "latest",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"

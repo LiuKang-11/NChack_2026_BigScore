@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "services/marketData.js"  ],
   "exclude": ["node_modules"]
 }
