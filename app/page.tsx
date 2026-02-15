@@ -1,65 +1,118 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
 
 export default function Home() {
+  const [coinName, setCoinName] = useState("");
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function searchCoin() {
+    if (!coinName) return;
+
+    setLoading(true);
+    setError("");
+    setResult(null);
+
+    try {
+      // Fetch top 250 coins from CoinGecko
+      const response = await fetch(
+        "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1",
+      );
+      const data = await response.json();
+
+      // Find the coin matching the input
+      const coin = data.find(
+        (c: any) =>
+          c.id === coinName.toLowerCase() ||
+          c.symbol.toLowerCase() === coinName.toLowerCase() ||
+          c.name.toLowerCase() === coinName.toLowerCase(),
+      );
+
+      if (!coin) {
+        setError("Coin not found. Try bitcoin or ethereum.");
+        setLoading(false);
+        return;
+      }
+
+      // Example: If AI score is provided externally, replace this with your teammate's API
+      // const aiResponse = await fetch(`/api/getCoinScore?coin=${coin.id}`);
+      // const aiData = await aiResponse.json();
+      // setResult({ ...coin, score: aiData.score });
+
+      // For now, just pass the coin (score will come from AI later)
+      setResult({ ...coin });
+      setLoading(false);
+    } catch (err) {
+      setError("Failed to fetch data.");
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="flex items-center justify-center min-h-screen bg-[#0f0f0f] text-white">
+      <div className="w-full max-w-md text-center">
+        <h1 className="text-4xl font-bold mb-2 text-pink-500 drop-shadow-lg">
+          Crypto Reliability Tracker
+        </h1>
+
+        <p className="text-gray-400 mb-6">
+          Search any cryptocurrency to see its reliability score.
+        </p>
+
+        <div className="flex mb-6 justify-center">
+          <input
+            type="text"
+            placeholder="Enter coin name"
+            value={coinName}
+            onChange={(e) => setCoinName(e.target.value)}
+            className="p-3 rounded-l-md w-64 bg-gray-900 text-white border border-gray-700 focus:outline-none focus:border-pink-500"
+          />
+          <button
+            onClick={searchCoin}
+            className="px-5 rounded-r-md font-bold bg-gradient-to-r from-pink-500 to-cyan-400 hover:shadow-lg"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            Search
+          </button>
         </div>
-      </main>
-    </div>
+
+        {loading && <p className="text-gray-400">Searching...</p>}
+        {error && <p className="text-red-500">{error}</p>}
+
+        {result && (
+          <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-lg border border-gray-700 text-left">
+            <h2 className="text-2xl font-bold mb-2 text-pink-500">
+              {result.name} ({result.symbol.toUpperCase()})
+            </h2>
+
+            <p>Price: ${result.current_price.toLocaleString()}</p>
+            <p>Market Cap: ${result.market_cap.toLocaleString()}</p>
+            <p>24h Change: {result.price_change_percentage_24h.toFixed(2)}%</p>
+
+            {result.score !== undefined ? (
+              <p className="mt-2 font-bold">
+                Reliability Score:{" "}
+                <span
+                  className={
+                    result.score >= 80
+                      ? "text-green-400"
+                      : result.score >= 60
+                        ? "text-yellow-400"
+                        : "text-red-500"
+                  }
+                >
+                  {result.score}
+                </span>
+              </p>
+            ) : (
+              <p className="mt-2 text-gray-400">
+                Reliability Score will be calculated by AI.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
