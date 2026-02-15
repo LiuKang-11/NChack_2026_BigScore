@@ -1,13 +1,20 @@
-import React from "react";
+import { headers } from "next/headers";
 
-type SearchParams = { coin?: string } | undefined;
+type SearchParams = { coin?: string };
 
-export default async function ScorePage({
-  searchParams,
-}: {
-  searchParams?: SearchParams;
+
+async function getBaseUrl() {
+  const h = await headers(); // ✅ await
+  const host = h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  return `${proto}://${host}`;
+}
+
+export default async function ScorePage(props: {
+  searchParams?: Promise<SearchParams> | SearchParams;
 }) {
-  const coin = (searchParams as any)?.coin;
+  const sp = props.searchParams ? await props.searchParams : {};
+  const coin = sp?.coin?.trim();
 
   if (!coin) {
     return (
@@ -15,7 +22,8 @@ export default async function ScorePage({
         <div className="w-full max-w-md text-center">
           <h1 className="text-2xl font-bold mb-4">No coin specified</h1>
           <p className="text-gray-400">
-            Provide a `coin` query parameter, e.g.{" "}
+            Provide a <code className="text-amber-300">coin</code> query
+            parameter, e.g.{" "}
             <span className="text-amber-300">/score?coin=bitcoin</span>
           </p>
         </div>
@@ -23,25 +31,29 @@ export default async function ScorePage({
     );
   }
 
-  // Fetch coin data from CoinGecko
+  // 1) Fetch coin market data from CoinGecko (server-side)
   const coinRes = await fetch(
     `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(
       coin,
     )}&per_page=1&page=1`,
     { cache: "no-store" },
   );
+
   const coinArr = await coinRes.json();
   const coinData = Array.isArray(coinArr) ? coinArr[0] : null;
 
-  // Fetch score from internal API
+  // 2) Fetch score from internal API (IMPORTANT: use absolute URL in Server Component)
   let score: any = null;
   try {
+    const baseUrl = await getBaseUrl();
     const scoreRes = await fetch(
-      `/api/score?coin=${encodeURIComponent(coin)}`,
+      `${baseUrl}/api/score?coin=${encodeURIComponent(coin)}`,
       { cache: "no-store" },
     );
-    if (scoreRes.ok) score = await scoreRes.json();
-    else score = { error: `Score API returned ${scoreRes.status}` };
+
+    score = scoreRes.ok
+      ? await scoreRes.json()
+      : { error: `Score API returned ${scoreRes.status}` };
   } catch (e) {
     score = { error: String(e) };
   }
@@ -80,8 +92,7 @@ export default async function ScorePage({
 
                 <p className="text-gray-300">
                   Confidence:{" "}
-                  <span className="text-teal-300">{score.confidence}</span>
-                  {"  "}
+                  <span className="text-teal-300">{score.confidence}</span>{" "}
                   <span className="text-gray-500">
                     (coverage {score.coverage}, no social)
                   </span>
