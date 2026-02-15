@@ -176,12 +176,10 @@ async def main():
 
     # weights
     w_market, w_dev, w_onchain, w_social = 0.25, 0.20, 0.35, 0.20
-    # 你目前若不算 social，就把 coverage 調成前三者，並 renormalize
     include_social = False
     if include_social:
         coverage = w_market + w_dev + w_onchain + w_social
         master_raw = (w_market*market["subscore"] + w_dev*dev["subscore"] + w_onchain*onchain["subscore"])
-        # 先不加 social 子分數（你還沒做），所以其實 include_social=True 不成立
     else:
         coverage = w_market + w_dev + w_onchain
         master_raw = (w_market*market["subscore"] + w_dev*dev["subscore"] + w_onchain*onchain["subscore"])

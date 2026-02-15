@@ -22,7 +22,7 @@ A blockchain forensics tool that analyzes cryptocurrencies for potential rug-pul
   - Top holder concentration
   - Contract verification status
 
-- **Social Sentiment** (20% weight)
+- **Social Sentiment** (20% weight) (Future Work)
   - Reddit community activity
   - Sentiment analysis metrics
 
@@ -34,6 +34,7 @@ The tool uses CoinGecko for market data, Alchemy for blockchain analysis, and Ba
 
 - Node.js v20+ 
 - npm or yarn
+- python 3
 - API Keys:
   - [Alchemy](https://alchemy.com) - Blockchain data
   - [CoinGecko](https://www.coingecko.com/api) - Market data
@@ -49,6 +50,18 @@ npm install
 echo "ALCHEMY_API_KEY=your_alchemy_key" > .env.local
 echo "COINGECKO_API_KEY=your_coingecko_key" >> .env.local
 echo "BACKBOARD_API_KEY=your_backboard_key" >> .env.local
+```
+### Backend setting
+- Create and go to the virtual env
+```
+python3 -m venv .venv 
+source .venv/bin/activate
+```
+
+- Install the necessary dependencies by running.
+
+```shell
+python3 -m pip install -r requirements.txt
 ```
 
 ## Usage
