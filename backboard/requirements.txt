@@ -1,0 +1,6 @@
+requests
+backboard-sdk
+asyncio
+os
+pathlib
+subprocess
