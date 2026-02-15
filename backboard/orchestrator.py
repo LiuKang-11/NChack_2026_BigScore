@@ -157,7 +157,8 @@ async def main():
     client = BackboardClient(api_key=api_key)
 
     # TODO: JS log for contextForAI
-    coin_name = "btc"  
+    #coin_name = "btc"  
+    coin_name = sys.argv[1].strip() if len(sys.argv) > 1 else "bitcoin"
     contextForAI = await get_context_for_ai(coin_name)
     
 
