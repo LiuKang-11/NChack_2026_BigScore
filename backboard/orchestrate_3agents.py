@@ -3,9 +3,7 @@ import os
 import json
 from backboard import BackboardClient
 
-MARKET_AGENT_ID  = "14451b4d-abbd-4e59-b399-50391d0d9042"
-DEV_AGENT_ID     = "2b8017a5-63d1-472f-a287-6caabb548fec"
-ONCHAIN_AGENT_ID = "d8e26fd9-89ad-4734-be3f-7125d2dd9e0a"
+
 
 contextForAI = {
   "name": "Bitcoin",

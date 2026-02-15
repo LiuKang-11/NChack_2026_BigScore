@@ -7,9 +7,10 @@ from backboard import BackboardClient
 
 
 # assistant_id 
-MARKET_AGENT_ID  = "c6f2a81d-0e64-4d51-a20b-66d7a44d4550"
-DEV_AGENT_ID     = "a35a0029-9334-4a17-a7ac-691002631e08"
-ONCHAIN_AGENT_ID = "5ecc94e5-35b3-43e4-b90c-8ff913d9327f"
+
+MARKET_AGENT_ID  = os.getenv("MARKET_AGENT_ID", "").strip()
+DEV_AGENT_ID     = os.getenv("DEV_AGENT_ID", "").strip()
+ONCHAIN_AGENT_ID = os.getenv("ONCHAIN_AGENT_ID", "").strip()
 
 def extract_json(text: str) -> dict:
     t = text.strip()

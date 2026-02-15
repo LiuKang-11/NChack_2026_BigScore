@@ -86,8 +86,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-#Orchestrator assistant_id: 4ed5e4f8-b0d0-439f-9919-792301883e72
-#Market agent assistant_id: c6f2a81d-0e64-4d51-a20b-66d7a44d4550
-#Dev Velocity agent assistant_id: a35a0029-9334-4a17-a7ac-691002631e08
-#On-chain agent assistant_id: 5ecc94e5-35b3-43e4-b90c-8ff913d9327f
