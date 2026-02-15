@@ -1,5 +1,6 @@
 import { fetchCoinGeckoData, searchCoinByName } from '../services/marketData.js';
 import { fetchAlchemyData } from '../services/chainData.js';
+import { fetchRedditSleuthData, fetchTwitterSleuthData } from '../services/socialData.js';
 import { cleanSleuthData } from '../services/dataCleaner.js';
 import { BackboardClient } from 'backboard-sdk';
 
@@ -60,10 +61,21 @@ if (!tokenAddress && cgRaw.asset_platform_id !== 'ethereum') {
     alchRaw = await fetchAlchemyData(tokenAddress);
   }
 
-  // 3. Clean
-  const contextForAI = cleanSleuthData(cgRaw, alchRaw);
+  // 3. Fetch social data (Reddit and Twitter) in parallel
+  const [redditData, twitterData] = await Promise.all([
+    fetchRedditSleuthData(cgRaw.links?.subreddit_url),
+    fetchTwitterSleuthData(cgRaw.links?.twitter_screen_name)
+  ]);
 
-  // 4. Agentic Analysis via Backboard
+  const socialData = {
+    reddit: redditData,
+    twitter: twitterData
+  };
+
+  // 4. Clean and normalize all data
+  const contextForAI = cleanSleuthData(cgRaw, alchRaw, socialData);
+
+  // 5. Agentic Analysis via Backboard
   const bb = new BackboardClient({ apiKey: process.env.BACKBOARD_API_KEY });
 
   const assistant = await bb.createAssistant({
@@ -139,7 +151,18 @@ export async function logContextForAI(coinNameOrId) {
     alchRaw = await fetchAlchemyData(tokenAddress);
   }
 
-  const contextForAI = cleanSleuthData(cgRaw, alchRaw);
+  // Fetch social data (Reddit and Twitter) in parallel
+  const [redditData, twitterData] = await Promise.all([
+    fetchRedditSleuthData(cgRaw.links?.subreddit_url),
+    fetchTwitterSleuthData(cgRaw.links?.twitter_screen_name)
+  ]);
+
+  const socialData = {
+    reddit: redditData,
+    twitter: twitterData
+  };
+
+  const contextForAI = cleanSleuthData(cgRaw, alchRaw, socialData);
   //console.log('contextForAI:', contextForAI);
   console.error('contextForAI ready'); // optional debug to stderr
   console.log(JSON.stringify(contextForAI)); // stdout: pure JSON

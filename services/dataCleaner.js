@@ -1,4 +1,4 @@
-export function cleanSleuthData(cgData, alchData = null) {
+export function cleanSleuthData(cgData, alchData = null, socialData = null) {
     const mData = cgData.market_data;
     const dData = cgData.developer_data;
 
@@ -60,11 +60,15 @@ export function cleanSleuthData(cgData, alchData = null) {
         // 4. SOCIAL SENTIMENT (20% Weight)
         // Aggregates community engagement metrics
         social_sentiment: {
-            twitter_followers: cgData.community_data?.twitter_followers || 0,
-            reddit_subscribers: cgData.community_data?.reddit_subscribers || 0,
-            reddit_active_accounts_48h: cgData.community_data?.reddit_accounts_active_48h || 0,
+            ...(socialData?.twitter?.followers && socialData.twitter.followers > 0 ? {
+                twitter_followers: socialData.twitter.followers,
+            } : {}),
+            reddit_subscribers: socialData?.reddit?.subscribers || 0,
+            reddit_active_accounts_48h: socialData?.reddit?.active_accounts_48h || 0,
             sentiment_votes_up_pct: cgData.sentiment_votes_up_percentage || 0,
             sentiment_votes_down_pct: cgData.sentiment_votes_down_percentage || 0,
+            reddit_url: cgData.links?.subreddit_url,
+            twitter_handle: cgData.links?.twitter_screen_name
         }
     };
 }

@@ -1,36 +1,179 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HackNCState 2026 - Crypto Reliability Tracker
 
-## Getting Started
+A blockchain forensics tool that analyzes cryptocurrencies for potential rug-pull and fraud indicators using on-chain data, developer metrics, and community signals.
 
-First, run the development server:
+## What It Does
+
+**Rug-Pull Sleuth** performs deep analysis on any cryptocurrency to assess fraud risk by examining:
+
+- **Market Integrity** (25% weight)
+  - Price history and volatility patterns
+  - Trading volume vs. market cap ratios
+  - All-time highs/lows and performance trends
+
+- **Developer Velocity** (20% weight)
+  - GitHub activity and commit history
+  - Issue resolution rates
+  - Maintenance health
+
+- **On-Chain Security** (35% weight)
+  - Contract deployer information
+  - Liquidity burn history
+  - Top holder concentration
+  - Contract verification status
+
+- **Social Sentiment** (20% weight)
+  - Reddit community activity
+  - Sentiment analysis metrics
+
+The tool uses CoinGecko for market data, Alchemy for blockchain analysis, and Backboard AI for agentic pattern matching against known scams.
+
+## Setup
+
+### Prerequisites
+
+- Node.js v20+ 
+- npm or yarn
+- API Keys:
+  - [Alchemy](https://alchemy.com) - Blockchain data
+  - [CoinGecko](https://www.coingecko.com/api) - Market data
+  - [Backboard](https://backboard.pro) - AI analysis
+
+### Installation
+
+```bash
+# Install dependencies
+npm install
+
+# Create .env.local with your API keys
+echo "ALCHEMY_API_KEY=your_alchemy_key" > .env.local
+echo "COINGECKO_API_KEY=your_coingecko_key" >> .env.local
+echo "BACKBOARD_API_KEY=your_backboard_key" >> .env.local
+```
+
+## Usage
+
+### Quick Test - View Analysis Data
+
+```bash
+# Load env vars and test with Bitcoin
+node --env-file=.env.local --input-type=module -e "import('./actions/sleuthAction.js').then(m=>m.logContextForAI('Bitcoin')).catch(console.error)"
+```
+
+Output shows:
+- Coin metadata
+- Market metrics (price, volume, cap)
+- Developer activity
+- On-chain security signals
+- Community engagement data
+
+### Full AI Investigation
+
+```bash
+node --env-file=.env.local --input-type=module -e "import('./actions/sleuthAction.js').then(m=>m.runInvestigation('Bitcoin')).catch(console.error)"
+```
+
+Returns AI-generated analysis:
+```json
+{
+  "is_rug": false,
+  "risk_score": 5,
+  "reason": "Established network with strong developer activity and community support..."
+}
+```
+
+### Custom Coins
+
+Search by name (auto-resolves to CoinGecko ID):
+```bash
+node --env-file=.env.local --input-type=module -e "import('./actions/sleuthAction.js').then(m=>m.logContextForAI('Ethereum')).catch(console.error)"
+```
+
+Or use CoinGecko ID directly:
+```bash
+node --env-file=.env.local --input-type=module -e "import('./actions/sleuthAction.js').then(m=>m.logContextForAI('ethereum')).catch(console.error)"
+```
+
+For native blockchain coins without Ethereum contracts (Bitcoin, Solana), the tool automatically finds wrapped versions (WBTC, SOL).
+
+## Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Runs Next.js dev server at [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+actions/
+  sleuthAction.js       - Main investigation orchestration
+services/
+  marketData.js         - CoinGecko integration
+  chainData.js          - Alchemy blockchain queries
+  dataCleaner.js        - Data normalization & scoring
+  socialData.js         - Community metrics (Reddit)
+lib/
+  alchemy.js            - Alchemy client
+  backboard.js          - Backboard AI client (optional)
+app/
+  layout.tsx            - Next.js layout
+  page.tsx              - Frontend UI
+```
 
-## Learn More
+## API Reference
 
-To learn more about Next.js, take a look at the following resources:
+### logContextForAI(coinNameOrId)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Returns cleaned analysis data without AI interpretation.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Parameters:**
+- `coinNameOrId` (string) - Coin name or CoinGecko ID
 
-## Deploy on Vercel
+**Returns:**
+```javascript
+{
+  name: string,
+  symbol: string,
+  age_days: number,
+  market_integrity: { ... },
+  dev_velocity: { ... },
+  on_chain_security: { ... },
+  social_sentiment: { ... }
+}
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### runInvestigation(coinNameOrId)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Performs full analysis with AI assessment.
+
+**Parameters:**
+- `coinNameOrId` (string) - Coin name or CoinGecko ID
+
+**Returns:**
+```javascript
+{
+  is_rug: boolean,
+  risk_score: number (0-100),
+  reason: string
+}
+```
+
+## Error Handling
+
+- **Missing API Key**: Ensure `.env.local` is in project root and `node --env-file` flag is used
+- **Coin Not Found**: Check CoinGecko for correct spelling or use their public ID
+- **No Ethereum Address**: For native blockchains, tool auto-searches for wrapped versions
+- **Backboard Disabled**: If `BACKBOARD_API_KEY` is missing, `runInvestigation()` will fail; use `logContextForAI()` instead
+
+## Notes
+
+- **Twitter Data**: Disabled (X API requires official authentication). Reddit data still included.
+- **Rate Limits**: Respect Alchemy, CoinGecko, and Backboard rate limits
+- **Wrapped Coins**: Bitcoin → WBTC, Solana → SOL (auto-detected)
+- **Memory**: Backboard maintains persistent memory of analyzed scams for pattern matching
+
+## License
+
+MIT
