@@ -6,7 +6,7 @@ export async function GET(req) {
   const coin = searchParams.get("coin");
   if (!coin) return NextResponse.json({ error: "Missing coin" }, { status: 400 });
 
-  const py = spawn("python3", ["backboard/orchestrator.py", coin], {
+  const py = spawn("python", ["backboard/orchestrator.py", coin], {
     env: process.env,
   });
 

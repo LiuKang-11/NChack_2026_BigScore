@@ -2,11 +2,9 @@
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
-# install node deps
 COPY package*.json ./
 RUN npm ci
 
-# copy source and build next
 COPY . .
 RUN npm run build
 
@@ -15,21 +13,22 @@ RUN npm run build
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 
-# install python3 + pip
+# install python + venv
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 python3-pip \
+ && apt-get install -y --no-install-recommends python3 python3-pip python3-venv \
  && rm -rf /var/lib/apt/lists/*
 
-# copy node runtime artifacts
+# Create virtualenv + make it default
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# copy built app + source
 COPY --from=builder /app ./
 
-# install python deps (if any)
-# (safe even if requirements.txt is empty / minimal)
-RUN if [ -f requirements.txt ]; then pip3 install --no-cache-dir -r requirements.txt; fi
+# install python deps into venv (only if requirements.txt exists)
+RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
 
 ENV NODE_ENV=production
-ENV PORT=3000
 EXPOSE 3000
 
-# IMPORTANT: use Next.js start (needs "next start")
-CMD ["npm", "start"]
+CMD ["npm","start"]
