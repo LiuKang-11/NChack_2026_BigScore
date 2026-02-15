@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/score",
+      "destination": "https://nchack-2026-bigscore.onrender.com/api/score"
+    }
+  ]
+}

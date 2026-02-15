@@ -33,21 +33,36 @@ export async function runInvestigation(coinNameOrId) {
       console.log(`No wrapped version found for ${cgRaw.name}`);
     }
   }
-  
-  // 4. Fetch Alchemy and social data in parallel
-  const [alchRaw, redditSleuth, twitterSleuth] = await Promise.all([
-    tokenAddress ? fetchAlchemyData(tokenAddress) : Promise.resolve(null),
-    fetchRedditSleuthData(cgRaw.links?.subreddit_url),
-    fetchTwitterSleuthData(cgRaw.links?.twitter_screen_name)
-  ]);
-  
-  // 5. Combine all data
-  const socialData = { reddit: redditSleuth, twitter: twitterSleuth };
-  const contextForAI = cleanSleuthData(cgRaw, alchRaw, socialData);
+  */
 
-  // 6. Agentic Analysis via Backboard
-  const bb = new BackboardClient(process.env.BACKBOARD_API_KEY);
-  const assistant = await bb.create_assistant({
+// If no Ethereum address found, try searching for wrapped version
+if (!tokenAddress && cgRaw.asset_platform_id !== 'ethereum') {
+  console.error(`No Ethereum address for ${coinId}, searching for wrapped version...`);
+  try {
+    const wrappedCoinId = await searchCoinByName(`Wrapped ${cgRaw.name}`);
+    const wrappedCgRaw = await fetchCoinGeckoData(wrappedCoinId);
+    tokenAddress = wrappedCgRaw.platforms?.ethereum || wrappedCgRaw.contract_address;
+    if (tokenAddress) {
+      console.error(`Found wrapped version: ${wrappedCoinId} at ${tokenAddress}`);
+    }
+  } catch (e) {
+    console.error(`No wrapped version found for ${cgRaw.name}`);
+  }
+}
+
+  // 2. Fetch Alchemy data if there's an Ethereum address
+  let alchRaw = null;
+  if (tokenAddress) {
+    alchRaw = await fetchAlchemyData(tokenAddress);
+  }
+
+  // 3. Clean
+  const contextForAI = cleanSleuthData(cgRaw, alchRaw);
+
+  // 4. Agentic Analysis via Backboard
+  const bb = new BackboardClient({ apiKey: process.env.BACKBOARD_API_KEY });
+
+  const assistant = await bb.createAssistant({
     name: "Rug-Pull Sleuth",
     system_prompt: `You are a crypto fraud detective. Analyze the provided JSON. 
     Compare it against your memory of previous scams.
@@ -55,8 +70,8 @@ export async function runInvestigation(coinNameOrId) {
     memory: "Auto" 
   });
 
-  const thread = await bb.create_thread(assistant.assistant_id);
-  const investigation = await bb.add_message({
+  const thread = await bb.createThread(assistant.assistant_id);
+  const investigation = await bb.addMessage({
     thread_id: thread.thread_id,
     content: JSON.stringify(contextForAI)
   });
@@ -65,41 +80,60 @@ export async function runInvestigation(coinNameOrId) {
 }
 
 export async function logContextForAI(coinNameOrId) {
-    let coinId = coinNameOrId;
+  // Resolve coin name to ID if necessary
+  let coinId = coinNameOrId;
+  try {
+    // Try fetching directly first (if it's already an ID)
+    await fetchCoinGeckoData(coinId);
+  } catch (error) {
+    // If that fails, try searching by name
+    coinId = await searchCoinByName(coinNameOrId);
+  }
+
+  // Fetch CoinGecko data first to get the token address
+  const cgRaw = await fetchCoinGeckoData(coinId);
+  
+  // Extract token address from CoinGecko data (usually in platforms.ethereum)
+  let tokenAddress = cgRaw.platforms?.ethereum || cgRaw.contract_address;
+  
+  // If no Ethereum address found, try searching for wrapped version
+  /*
+  if (!tokenAddress && cgRaw.asset_platform_id !== 'ethereum') {
+    console.log(`No Ethereum address for ${coinId}, searching for wrapped version...`);
     try {
         await fetchCoinGeckoData(coinId);
     } catch (error) {
         coinId = await searchCoinByName(coinNameOrId);
     }
+  }
+  */
 
-    const cgRaw = await fetchCoinGeckoData(coinId);
-    let tokenAddress = cgRaw.platforms?.ethereum || cgRaw.contract_address;
-    
-    // If no Ethereum address found, try searching for wrapped version
-    if (!tokenAddress && cgRaw.asset_platform_id !== 'ethereum') {
-        console.log(`No Ethereum address for ${coinId}, searching for wrapped version...`);
-        try {
-            const wrappedCoinId = await searchCoinByName(`Wrapped ${cgRaw.name}`);
-            const wrappedCgRaw = await fetchCoinGeckoData(wrappedCoinId);
-            tokenAddress = wrappedCgRaw.platforms?.ethereum || wrappedCgRaw.contract_address;
-        if (tokenAddress) {
-            console.log(`Found wrapped version: ${wrappedCoinId} at ${tokenAddress}`);
-        }
-        } catch (e) {
-            console.log(`No wrapped version found for ${cgRaw.name}`);
-        }
+  if (!tokenAddress && cgRaw.asset_platform_id !== 'ethereum') {
+    console.error(`No Ethereum address for ${coinId}, searching for wrapped version...`);
+    try {
+      const wrappedCoinId = await searchCoinByName(`Wrapped ${cgRaw.name}`);
+      const wrappedCgRaw = await fetchCoinGeckoData(wrappedCoinId);
+      tokenAddress = wrappedCgRaw.platforms?.ethereum || wrappedCgRaw.contract_address;
+      if (tokenAddress) {
+        console.error(`Found wrapped version: ${wrappedCoinId} at ${tokenAddress}`);
+      }
+    } catch (e) {
+      console.error(`No wrapped version found for ${cgRaw.name}`);
     }
-    
-    // Fetch Alchemy and social data in parallel
-    const [alchRaw, redditSleuth, twitterSleuth] = await Promise.all([
-        tokenAddress ? fetchAlchemyData(tokenAddress) : Promise.resolve(null),
-        fetchRedditSleuthData(cgRaw.links?.subreddit_url),
-        fetchTwitterSleuthData(cgRaw.links?.twitter_screen_name)
-    ]);
-    
-    const socialData = { reddit: redditSleuth, twitter: twitterSleuth };
-    const contextForAI = cleanSleuthData(cgRaw, alchRaw, socialData);
-    
-    console.log('contextForAI:', contextForAI);
-    return contextForAI;
+  }
+  
+
+  
+  // Fetch Alchemy data if there's an Ethereum address
+  let alchRaw = null;
+  if (tokenAddress) {
+    alchRaw = await fetchAlchemyData(tokenAddress);
+  }
+
+  const contextForAI = cleanSleuthData(cgRaw, alchRaw);
+  //console.log('contextForAI:', contextForAI);
+  console.error('contextForAI ready'); // optional debug to stderr
+  console.log(JSON.stringify(contextForAI)); // stdout: pure JSON
+  return contextForAI;
+
 }
