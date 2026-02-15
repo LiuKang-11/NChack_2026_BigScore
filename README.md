@@ -45,8 +45,17 @@ The tool uses CoinGecko for market data, Alchemy for blockchain analysis, and Ba
 ```bash
 # Install dependencies
 npm install
+```
 
-# Create .env.local with your API keys
+**Required npm packages** (installed via npm install):
+- `backboard-sdk` - AI agent for pattern matching
+- `alchemy-sdk` - Blockchain data queries
+- `dotenv` - Environment variable loading
+- `next` - React framework
+- `typescript` - Type safety
+
+**Create .env.local with your API keys:**
+```bash
 echo "ALCHEMY_API_KEY=your_alchemy_key" > .env.local
 echo "COINGECKO_API_KEY=your_coingecko_key" >> .env.local
 echo "BACKBOARD_API_KEY=your_backboard_key" >> .env.local
@@ -64,10 +73,31 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
+> **Important**: When testing via CLI, use the `--env-file=.env.local` flag to load environment variables into the Node process. This ensures your API keys are available to the application.
+
 ## Usage
 
 ### Quick Test - View Analysis Data
 
+**Important**: Use `--env-file=.env.local` to load your API keys before running CLI commands.
+
+If your keys are still not being recognized after using the `--env-file` flag, manually export them in your terminal:
+
+**PowerShell:**
+```powershell
+$env:ALCHEMY_API_KEY="your_alchemy_key"
+$env:COINGECKO_API_KEY="your_coingecko_key"
+$env:BACKBOARD_API_KEY="your_backboard_key"
+```
+
+**Bash/WSL:**
+```bash
+export ALCHEMY_API_KEY="your_alchemy_key"
+export COINGECKO_API_KEY="your_coingecko_key"
+export BACKBOARD_API_KEY="your_backboard_key"
+```
+
+Then run:
 ```bash
 # Load env vars and test with Bitcoin
 node --env-file=.env.local --input-type=module -e "import('./actions/sleuthAction.js').then(m=>m.logContextForAI('Bitcoin')).catch(console.error)"
@@ -82,11 +112,13 @@ Output shows:
 
 ### Full AI Investigation
 
+**Requires valid `BACKBOARD_API_KEY` in .env.local**
+
 ```bash
 node --env-file=.env.local --input-type=module -e "import('./actions/sleuthAction.js').then(m=>m.runInvestigation('Bitcoin')).catch(console.error)"
 ```
 
-Returns AI-generated analysis:
+Returns AI-generated risk assessment:
 ```json
 {
   "is_rug": false,
@@ -173,12 +205,29 @@ Performs full analysis with AI assessment.
 }
 ```
 
+## CLI Temperature Guide
+
+### Running Commands from Terminal
+
+When testing via CLI, **always use the `--env-file=.env.local` flag**. This tells Node to load your API keys from the .env.local file before executing:
+
+```bash
+node --env-file=.env.local --input-type=module -e "..."
+```
+
+Without this flag:
+- `process.env.ALCHEMY_API_KEY` will be `undefined`
+- `process.env.COINGECKO_API_KEY` will be `undefined`
+- `process.env.BACKBOARD_API_KEY` will be `undefined`
+
+This results in "API key is required" errors.
+
 ## Error Handling
 
-- **Missing API Key**: Ensure `.env.local` is in project root and `node --env-file` flag is used
-- **Coin Not Found**: Check CoinGecko for correct spelling or use their public ID
+- **Missing API Keys**: Ensure `.env.local` exists in project root with all three keys, and use `node --env-file=.env.local` flag
+- **Coin Not Found**: Check CoinGecko for correct spelling or use their public ID directly
 - **No Ethereum Address**: For native blockchains, tool auto-searches for wrapped versions
-- **Backboard Disabled**: If `BACKBOARD_API_KEY` is missing, `runInvestigation()` will fail; use `logContextForAI()` instead
+- **Backboard Disabled**: If `BACKBOARD_API_KEY` is missing or invalid, `runInvestigation()` will fail; use `logContextForAI()` to view data without AI
 
 ## Notes
 

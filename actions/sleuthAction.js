@@ -80,19 +80,46 @@ if (!tokenAddress && cgRaw.asset_platform_id !== 'ethereum') {
 
   const assistant = await bb.createAssistant({
     name: "Rug-Pull Sleuth",
-    system_prompt: `You are a crypto fraud detective. Analyze the provided JSON. 
+    description: `You are a crypto fraud detective. Analyze the provided JSON. 
     Compare it against your memory of previous scams.
-    Return a JSON: { "is_rug": boolean, "risk_score": 0-100, "reason": string }`,
+    Return a JSON: {{ "is_rug": boolean, "risk_score": 0-100, "reason": string }}`,
     memory: "Auto" // Critical: This enables the AI to learn from past investigations
   });
 
-  const thread = await bb.createThread(assistant.assistant_id);
-  const investigation = await bb.addMessage({
-    thread_id: thread.thread_id,
+  console.error("[sleuthAction] Assistant response:", JSON.stringify(assistant, null, 2));
+  
+  if (!assistant || !assistant.assistantId) {
+    throw new Error(`Assistant creation failed. Response: ${JSON.stringify(assistant)}`);
+  }
+
+  const thread = await bb.createThread(assistant.assistantId);
+  console.error("[sleuthAction] Thread response:", JSON.stringify(thread, null, 2));
+  
+  const threadId = thread.threadId || thread.thread_id;
+  if (!threadId) {
+    throw new Error(`Thread creation failed. Response: ${JSON.stringify(thread)}`);
+  }
+
+  console.error("[sleuthAction] About to call addMessage with threadId:", threadId);
+  
+  const investigation = await bb.addMessage(threadId, {
     content: JSON.stringify(contextForAI)
   });
+  
+  console.error("[sleuthAction] Investigation response:", JSON.stringify(investigation, null, 2));
+  
+  if (investigation.status === "FAILED") {
+    throw new Error(`Assistant evaluation failed: ${investigation.content}`);
+  }
 
-  return JSON.parse(investigation.content);
+  // Extract JSON from markdown code fences if present
+  let jsonContent = investigation.content;
+  const codeBlockMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    jsonContent = codeBlockMatch[1].trim();
+  }
+  
+  return JSON.parse(jsonContent);
 }
 
 export async function logContextForAI(coinNameOrId) {
