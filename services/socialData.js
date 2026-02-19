@@ -48,24 +48,70 @@ export async function fetchRedditSleuthData(subredditUrl) {
 }
 
 /**
- * Fetches X (Twitter) data.
- * NOTE: Twitter has disabled all public scraping endpoints.
- * For production use, you'll need the official X API with authentication.
- * 
- * This placeholder returns a graceful message.
+ * Fetches X (Twitter) data via official X API v2 (app-only bearer token).
+ * Required env var: X_BEARER_TOKEN
  */
 export async function fetchTwitterSleuthData(screenName) {
     if (!screenName) return null;
-    
+
     const handle = screenName.replace('@', '').trim();
     if (!handle) return null;
-    
-    // Twitter/X API would go here - returns null gracefully for now
-    console.log(`[Twitter Sleuth] X API not configured. To fetch @${handle} data, set up official X API keys.`);
-    return {
-        handle,
-        status: 'api_not_configured',
-        note: 'Twitter API requires official authentication. Not fetched.',
-        followers: null
-    };
+
+    const token = process.env.X_BEARER_TOKEN?.trim();
+    if (!token) {
+        console.error(`[Twitter Sleuth] X_BEARER_TOKEN missing. Skipping @${handle}.`);
+        return {
+            handle,
+            status: 'api_not_configured',
+            note: 'Set X_BEARER_TOKEN to enable X API lookups.',
+            followers: 0
+        };
+    }
+
+    try {
+        const url =
+            `https://api.twitter.com/2/users/by/username/${encodeURIComponent(handle)}` +
+            `?user.fields=public_metrics,verified,created_at,description`;
+
+        const res = await fetch(url, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/json'
+            }
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            console.error(`[Twitter Sleuth] X API error for @${handle}: ${res.status} ${text}`);
+            return {
+                handle,
+                status: 'api_error',
+                note: `X API request failed (${res.status}).`,
+                followers: 0
+            };
+        }
+
+        const body = await res.json();
+        const user = body?.data;
+        const metrics = user?.public_metrics || {};
+
+        return {
+            handle,
+            status: 'ok',
+            followers: metrics.followers_count || 0,
+            following: metrics.following_count || 0,
+            tweet_count: metrics.tweet_count || 0,
+            listed_count: metrics.listed_count || 0,
+            verified: !!user?.verified,
+            created_at: user?.created_at || null
+        };
+    } catch (error) {
+        console.error(`[Twitter Sleuth] Unexpected error for @${handle}:`, error);
+        return {
+            handle,
+            status: 'error',
+            note: 'Unexpected X fetch error.',
+            followers: 0
+        };
+    }
 }

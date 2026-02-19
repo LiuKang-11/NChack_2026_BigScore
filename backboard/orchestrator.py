@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 import sys, json
 from backboard import BackboardClient
@@ -52,7 +53,34 @@ async def get_context_for_ai(coin_name: str) -> dict:
     #print("[node stdout length]", len(out))
     #print("[node stdout head]", out[:200])
 
-    return json.loads(out)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"get_context.js failed for coin='{coin_name}' "
+            f"(exit={proc.returncode}). stderr:\n{err}"
+        )
+
+    if not out:
+        raise RuntimeError(
+            f"get_context.js returned empty stdout for coin='{coin_name}'. "
+            f"stderr:\n{err}"
+        )
+
+    try:
+        return json.loads(out)
+    except Exception:
+        i = out.find("{")
+        j = out.rfind("}")
+        if i != -1 and j != -1 and j > i:
+            try:
+                return json.loads(out[i:j+1])
+            except Exception:
+                pass
+
+        raise RuntimeError(
+            f"get_context.js returned invalid JSON for coin='{coin_name}'. "
+            f"stdout_head={out[:300]!r}\n"
+            f"stderr:\n{err}"
+        )
 
 def to_float(x, default=0.5):
     try:
@@ -75,6 +103,88 @@ def normalize_confidence(x):
     if x > 1.0:
         x = 1.0
     return x
+
+def clamp(x, lo, hi):
+    return max(lo, min(hi, x))
+
+def score_social(ctx: dict) -> dict:
+    social = (ctx or {}).get("social_sentiment", {}) or {}
+
+    reddit_subscribers = max(0.0, to_float(social.get("reddit_subscribers"), 0.0))
+    reddit_active_48h = max(0.0, to_float(social.get("reddit_active_accounts_48h"), 0.0))
+    up_pct = clamp(to_float(social.get("sentiment_votes_up_pct"), 50.0), 0.0, 100.0)
+    down_pct = clamp(to_float(social.get("sentiment_votes_down_pct"), 50.0), 0.0, 100.0)
+    twitter_followers = max(0.0, to_float(social.get("twitter_followers"), 0.0))
+
+    # Log scaling keeps very large communities from dominating the score.
+    reddit_size_score = clamp((math.log10(reddit_subscribers + 1) / 6.0) * 100.0, 0.0, 100.0)
+    twitter_size_score = clamp((math.log10(twitter_followers + 1) / 7.0) * 100.0, 0.0, 100.0)
+
+    active_ratio = reddit_active_48h / max(reddit_subscribers, 1.0)
+    active_score = clamp(active_ratio * 5000.0, 0.0, 100.0)
+
+    sentiment_delta = up_pct - down_pct
+    sentiment_score = clamp(50.0 + (sentiment_delta * 0.5), 0.0, 100.0)
+
+    has_reddit = reddit_subscribers > 0
+    has_sentiment_votes = (up_pct + down_pct) > 0
+    has_twitter = twitter_followers > 0
+
+    if not (has_reddit or has_sentiment_votes or has_twitter):
+        subscore = 50.0
+        confidence = 0.25
+        flags = ["Social data unavailable"]
+        explanation = "Social signals are unavailable, so a neutral social sentiment score was applied."
+    else:
+        subscore = (
+            0.35 * reddit_size_score +
+            0.25 * active_score +
+            0.30 * sentiment_score +
+            0.10 * twitter_size_score
+        )
+
+        confidence = 0.35
+        if has_reddit:
+            confidence += 0.30
+        if has_sentiment_votes:
+            confidence += 0.25
+        if has_twitter:
+            confidence += 0.10
+        confidence = clamp(confidence, 0.0, 0.95)
+
+        flags = []
+        if reddit_subscribers < 1000:
+            flags.append("Low Reddit community size")
+        if has_reddit and active_ratio < 0.002:
+            flags.append("Low Reddit activity ratio")
+        if sentiment_delta < -10:
+            flags.append("Negative sentiment bias")
+        if sentiment_delta > 25:
+            flags.append("Strong positive sentiment")
+
+        explanation = (
+            f"Social sentiment uses Reddit size/activity and vote sentiment "
+            f"(up {round(up_pct, 1)}%, down {round(down_pct, 1)}%)."
+        )
+
+    return {
+        "subscore": round(clamp(subscore, 0.0, 100.0), 2),
+        "confidence": round(confidence, 2),
+        "flags": flags,
+        "explanation": explanation,
+        "details": {
+            "reddit_subscribers": int(reddit_subscribers),
+            "reddit_active_accounts_48h": int(reddit_active_48h),
+            "reddit_activity_ratio": round(active_ratio, 6),
+            "sentiment_votes_up_pct": round(up_pct, 2),
+            "sentiment_votes_down_pct": round(down_pct, 2),
+            "twitter_followers": int(twitter_followers),
+            "reddit_size_score": round(reddit_size_score, 2),
+            "activity_score": round(active_score, 2),
+            "sentiment_score": round(sentiment_score, 2),
+            "twitter_size_score": round(twitter_size_score, 2),
+        },
+    }
 
 
 '''
@@ -170,19 +280,20 @@ async def main():
         ask_agent(client, DEV_AGENT_ID, prompt_dev(contextForAI)),
         ask_agent(client, ONCHAIN_AGENT_ID, prompt_onchain(contextForAI)),
     )
+    social = score_social(contextForAI)
     #print("types:", type(market), type(dev), type(onchain))
     #print("market raw keys:", list(market.keys())[:10])
 
 
     # weights
     w_market, w_dev, w_onchain, w_social = 0.25, 0.20, 0.35, 0.20
-    include_social = False
-    if include_social:
-        coverage = w_market + w_dev + w_onchain + w_social
-        master_raw = (w_market*market["subscore"] + w_dev*dev["subscore"] + w_onchain*onchain["subscore"])
-    else:
-        coverage = w_market + w_dev + w_onchain
-        master_raw = (w_market*market["subscore"] + w_dev*dev["subscore"] + w_onchain*onchain["subscore"])
+    coverage = w_market + w_dev + w_onchain + w_social
+    master_raw = (
+        w_market * market["subscore"] +
+        w_dev * dev["subscore"] +
+        w_onchain * onchain["subscore"] +
+        w_social * social["subscore"]
+    )
 
     master = master_raw / coverage
 
@@ -195,7 +306,8 @@ async def main():
     conf_raw = (
         w_market  * normalize_confidence(market.get("confidence")) +
         w_dev     * normalize_confidence(dev.get("confidence")) +
-        w_onchain * normalize_confidence(onchain.get("confidence"))
+        w_onchain * normalize_confidence(onchain.get("confidence")) +
+        w_social  * normalize_confidence(social.get("confidence"))
     )
 
     confidence = conf_raw / coverage
@@ -203,7 +315,8 @@ async def main():
     flags = sorted(set(
         (market.get("flags", []) or []) +
         (dev.get("flags", []) or []) +
-        (onchain.get("flags", []) or [])
+        (onchain.get("flags", []) or []) +
+        (social.get("flags", []) or [])
     ))
 
     result = {
@@ -211,23 +324,26 @@ async def main():
         "master_score": round(master, 2),
         "confidence": round(confidence, 2),
         "coverage": round(coverage, 2),
-        "included_components": ["market_integrity", "dev_velocity", "on_chain_security"],
-        "excluded_components": ["social_sentiment"],
+        "included_components": ["market_integrity", "dev_velocity", "on_chain_security", "social_sentiment"],
+        "excluded_components": [],
         "subscores": {
             "market_integrity": market["subscore"],
             "dev_velocity": dev["subscore"],
             "on_chain_security": onchain["subscore"],
+            "social_sentiment": social["subscore"],
         },
         "flags": flags,
         "rationale": {
             "market_integrity": market.get("explanation", ""),
             "dev_velocity": dev.get("explanation", ""),
             "on_chain_security": onchain.get("explanation", ""),
+            "social_sentiment": social.get("explanation", ""),
         },
         "details": {
             "market": market.get("details", {}),
             "dev": dev.get("details", {}),
             "onchain": onchain.get("details", {}),
+            "social": social.get("details", {}),
         }
     }
 

@@ -1,5 +1,6 @@
 import { fetchCoinGeckoData, searchCoinByName } from '../../services/marketData.js';
 import { fetchAlchemyData } from '../../services/chainData.js';
+import { fetchRedditSleuthData, fetchTwitterSleuthData } from '../../services/socialData.js';
 import { cleanSleuthData } from '../../services/dataCleaner.js';
 
 const coinNameOrId = process.argv[2];
@@ -36,10 +37,31 @@ try {
 
   let alchRaw = null;
   if (tokenAddress) {
-    alchRaw = await fetchAlchemyData(tokenAddress);
+    try {
+      alchRaw = await fetchAlchemyData(tokenAddress);
+    } catch (e) {
+      // Continue without on-chain data when Alchemy fails for a token/network.
+      console.error(
+        `Alchemy fetch failed for ${coinId} (${tokenAddress}):`,
+        e?.message || String(e),
+      );
+      alchRaw = null;
+    }
   }
 
-  const ctx = cleanSleuthData(cgRaw, alchRaw);
+  let socialRaw = null;
+  try {
+    const [reddit, twitter] = await Promise.all([
+      fetchRedditSleuthData(cgRaw.links?.subreddit_url),
+      fetchTwitterSleuthData(cgRaw.links?.twitter_screen_name),
+    ]);
+    socialRaw = { reddit, twitter };
+  } catch (e) {
+    console.error(`Social data fetch failed for ${coinId}:`, e?.message || String(e));
+    socialRaw = null;
+  }
+
+  const ctx = cleanSleuthData(cgRaw, alchRaw, socialRaw);
 
   // ✅ stdout: ONLY JSON
   process.stdout.write(JSON.stringify(ctx));
